@@ -1,30 +1,31 @@
-import { StackContext, Api, EventBus } from "sst/constructs";
+import { StackContext, Api, StaticSite } from 'sst/constructs';
 
 export function API({ stack }: StackContext) {
-  const bus = new EventBus(stack, "bus", {
-    defaults: {
-      retries: 10,
-    },
-  });
+    const api = new Api(stack, 'pawto-album', {
+        cors: true,
+        defaults: {
+            function: {
+                bind: [],
+            },
+        },
+        routes: {
+            'GET /{proxy+}': 'packages/functions/src/lambda.handler',
+            'POST /{proxy+}': 'packages/functions/src/lambda.handler',
+        },
+    });
 
-  const api = new Api(stack, "api", {
-    defaults: {
-      function: {
-        bind: [bus],
-      },
-    },
-    routes: {
-      "GET /": "packages/functions/src/lambda.handler",
-      "GET /todo": "packages/functions/src/todo.list",
-      "POST /todo": "packages/functions/src/todo.create",
-    },
-  });
+    const site = new StaticSite(stack, 'Site', {
+        path: 'packages/web',
+        environment: {
+            VITE_API_URL: api.customDomainUrl || api.url,
+            VITE_APP_URL: 'http://localhost:5173',
+        },
+        buildOutput: 'dist',
+        buildCommand: 'npm run build',
+    });
 
-  bus.subscribe("todo.created", {
-    handler: "packages/functions/src/events/todo-created.handler",
-  });
-
-  stack.addOutputs({
-    ApiEndpoint: api.url,
-  });
+    stack.addOutputs({
+        ApiEndpoint: api.customDomainUrl || api.url,
+        SiteUrl: site.customDomainUrl || site.url,
+    });
 }
