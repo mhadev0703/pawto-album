@@ -1,0 +1,19 @@
+import { MaybeParsed } from '../diff/maybe-parsed';
+export declare class ManagedPolicyAttachment {
+    readonly identityArn: string;
+    readonly managedPolicyArn: string;
+    static parseManagedPolicies(identityArn: string, arns: string | string[]): ManagedPolicyAttachment[];
+    constructor(identityArn: string, managedPolicyArn: string);
+    equal(other: ManagedPolicyAttachment): boolean;
+    /**
+     * Return a machine-readable version of the changes.
+     * This is only used in tests.
+     *
+     * @internal
+     */
+    _toJson(): MaybeParsed<ManagedPolicyJson>;
+}
+export interface ManagedPolicyJson {
+    identityArn: string;
+    managedPolicyArn: string;
+}

@@ -1,0 +1,243 @@
+import fs from "fs";
+import url from "url";
+import * as path from "path";
+import { Stack as CDKStack, CfnOutput, Duration as CDKDuration, DefaultStackSynthesizer, } from "aws-cdk-lib/core";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { useProject } from "../project.js";
+import { Function as Fn } from "./Function.js";
+import { isConstruct } from "./Construct.js";
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+/**
+ * The Stack construct extends cdk.Stack. It automatically prefixes the stack names with the stage and app name to ensure that they can be deployed to multiple regions in the same AWS account. It also ensure that the stack uses the same AWS profile and region as the app. They're defined using functions that return resources that can be imported by other stacks.
+ *
+ * @example
+ *
+ * ```js
+ * import { StackContext } from "sst/constructs";
+ *
+ * export function MyStack({ stack }: StackContext) {
+ *   // Define your stack
+ * }
+ * ```
+ */
+export class Stack extends CDKStack {
+    /**
+     * The current stage of the stack.
+     */
+    stage;
+    /**
+     * @internal
+     */
+    defaultFunctionProps;
+    /**
+     * Create a custom resource handler per stack. This handler will
+     * be used by all the custom resources in the stack.
+     * @internal
+     */
+    customResourceHandler;
+    /**
+     * Skip building Function/Site code when stack is not active
+     * ie. `sst remove` and `sst deploy PATTERN` (pattern not matched)
+     * @internal
+     */
+    isActive;
+    constructor(scope, id, props) {
+        const app = scope.node.root;
+        const stackId = app.logicalPrefixedName(id);
+        Stack.checkForPropsIsConstruct(id, props);
+        Stack.checkForEnvInProps(id, props);
+        super(scope, stackId, {
+            ...props,
+            env: {
+                account: app.account,
+                region: app.region,
+            },
+            synthesizer: props?.synthesizer || Stack.buildSynthesizer(),
+        });
+        this.stage = app.stage;
+        this.defaultFunctionProps = app.defaultFunctionProps.map((dfp) => typeof dfp === "function" ? dfp(this) : dfp);
+        this.customResourceHandler = this.createCustomResourceHandler();
+        this.isActive =
+            app.mode !== "remove" &&
+                (!app.isActiveStack || app.isActiveStack?.(this.stackName) === true);
+    }
+    /**
+     * The default function props to be applied to all the Lambda functions in the stack.
+     *
+     * @example
+     * ```js
+     * stack.setDefaultFunctionProps({
+     *   srcPath: "backend",
+     *   runtime: "nodejs18.x",
+     * });
+     * ```
+     */
+    setDefaultFunctionProps(props) {
+        const fns = this.getAllFunctions();
+        if (fns.length > 0)
+            throw new Error("Default function props for the stack must be set before any functions have been added. Use 'addDefaultFunctionEnv' or 'addDefaultFunctionPermissions' instead to add more default properties.");
+        this.defaultFunctionProps.push(props);
+    }
+    /**
+     * Adds additional default Permissions to be applied to all Lambda functions in the stack.
+     *
+     * @example
+     * ```js
+     * stack.addDefaultFunctionPermissions(["sqs", "s3"]);
+     * ```
+     */
+    addDefaultFunctionPermissions(permissions) {
+        this.defaultFunctionProps.push({
+            permissions,
+        });
+    }
+    /**
+     * Adds additional default environment variables to be applied to all Lambda functions in the stack.
+     *
+     * @example
+     * ```js
+     * stack.addDefaultFunctionEnv({
+     *   DYNAMO_TABLE: table.name
+     * });
+     * ```
+     */
+    addDefaultFunctionEnv(environment) {
+        this.defaultFunctionProps.push({
+            environment,
+        });
+    }
+    /**
+     * Binds additional resources to be applied to all Lambda functions in the stack.
+     *
+     * @example
+     * ```js
+     * app.addDefaultFunctionBinding([STRIPE_KEY, bucket]);
+     * ```
+     */
+    addDefaultFunctionBinding(bind) {
+        this.defaultFunctionProps.push({ bind });
+    }
+    /**
+     * Adds additional default layers to be applied to all Lambda functions in the stack.
+     *
+     * @example
+     * ```js
+     * stack.addDefaultFunctionLayers(["arn:aws:lambda:us-east-1:123456789012:layer:nodejs:3"]);
+     * ```
+     */
+    addDefaultFunctionLayers(layers) {
+        this.defaultFunctionProps.push({
+            layers,
+        });
+    }
+    /**
+     * Returns all the Function instances in this stack.
+     *
+     * @example
+     * ```js
+     * stack.getAllFunctions();
+     * ```
+     */
+    getAllFunctions() {
+        return this.doGetAllFunctions(this);
+    }
+    doGetAllFunctions(construct) {
+        const results = [];
+        for (const child of construct.node.children) {
+            if (child instanceof Fn)
+                results.push(child);
+            results.push(...this.doGetAllFunctions(child));
+        }
+        return results;
+    }
+    /**
+     * Add outputs to this stack
+     *
+     * @example
+     * ```js
+     * stack.addOutputs({
+     *   TableName: table.name,
+     * });
+     * ```
+     *
+     * ```js
+     * stack.addOutputs({
+     *   TableName: {
+     *     value: table.name,
+     *     exportName: "MyTableName",
+     *   }
+     * });
+     * ```
+     */
+    addOutputs(outputs) {
+        Object.entries(outputs)
+            .filter((e) => e[1] !== undefined)
+            .forEach(([key, value]) => {
+            // Note: add "SSTStackOutput" prefix to the CfnOutput id to ensure the id
+            //       does not thrash w/ construct ids in the stack. So users can do this:
+            //       ```
+            //       const table = new Table(stack, "myTable");
+            //       stack.addOutputs({ myTable: table.name });
+            //       ```
+            //       And then we override the logical id so the actual output name is
+            //       still "myTable".
+            const output = typeof value === "string"
+                ? new CfnOutput(this, `SSTStackOutput${key}`, { value })
+                : new CfnOutput(this, `SSTStackOutput${key}`, value);
+            // CloudFormation only allows alphanumeric characters in the output name.
+            output.overrideLogicalId(key.replace(/[^A-Za-z0-9]/g, ""));
+        });
+    }
+    createCustomResourceHandler() {
+        const dir = path.join(__dirname, "../support/custom-resources/");
+        return new lambda.Function(this, "CustomResourceHandler", {
+            code: lambda.Code.fromAsset(dir, {
+                //assetHash: this.stackName + "-custom-resources-20230130",
+                assetHash: this.stackName + fs.readFileSync(dir + "/index.mjs").toString(),
+            }),
+            handler: "index.handler",
+            runtime: lambda.Runtime.NODEJS_18_X,
+            timeout: CDKDuration.seconds(900),
+            memorySize: 1024,
+        });
+    }
+    static buildSynthesizer() {
+        const { config } = useProject();
+        const props = {
+            qualifier: config.cdk?.qualifier,
+            bootstrapStackVersionSsmParameter: config.cdk?.bootstrapStackVersionSsmParameter,
+            fileAssetsBucketName: config.cdk?.fileAssetsBucketName,
+            deployRoleArn: config.cdk?.deployRoleArn,
+            fileAssetPublishingRoleArn: config.cdk?.fileAssetPublishingRoleArn,
+            imageAssetPublishingRoleArn: config.cdk?.imageAssetPublishingRoleArn,
+            imageAssetsRepositoryName: config.cdk?.imageAssetsRepositoryName,
+            cloudFormationExecutionRole: config.cdk?.cloudFormationExecutionRole,
+            lookupRoleArn: config.cdk?.lookupRoleArn,
+        };
+        const isEmpty = Object.values(props).every((v) => v === undefined);
+        if (isEmpty)
+            return;
+        return new DefaultStackSynthesizer(props);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static checkForPropsIsConstruct(id, props) {
+        // If a construct is passed in as stack props, let's detect it and throw a
+        // friendlier error.
+        if (props && isConstruct(props)) {
+            throw new Error(`Expected an associative array as the stack props while initializing "${id}" stack. Received a construct instead.`);
+        }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static checkForEnvInProps(id, props) {
+        if (props && props.env) {
+            let envS = "";
+            try {
+                envS = " (" + JSON.stringify(props.env) + ")";
+            }
+            catch (e) {
+                // Ignore
+            }
+            throw new Error(`Do not set the "env" prop while initializing "${id}" stack${envS}. Use the "AWS_PROFILE" environment variable and "--region" CLI option instead.`);
+        }
+    }
+}
