@@ -7,6 +7,7 @@ import {
   autoCropImages,
 } from '../../utils/utils';
 import ImageCropModal from '../../components/ImageCropModal/ImageCropModal';
+import CollectionInfo from '../../components/CollectionInfo/CollectionInfo';
 
 
 export default function Start() {
@@ -127,17 +128,10 @@ export default function Start() {
       </div>
       <div className='container'>
         {isUploaded ? (
-          <div className='preview-image-wrapper'>
-            {croppedImages.map((photo, index) => (
-              <img
-                key={index}
-                src={photo}
-                alt=''
-                className='preview-image'
-                onClick={() => changeCroppingImageIndex(index)} // Open the modal when the image is clicked
-              />
-            ))}
-          </div>
+          <CollectionInfo
+            croppedImages={croppedImages}
+            changeCroppingImageIndex={changeCroppingImageIndex}
+          />
         ) : (
           <div>
             <label className='button' htmlFor='upload-photos'>
