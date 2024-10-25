@@ -9,6 +9,7 @@ export default function CollectionInfo(props) {
     const [title, setTitle] = useState('');
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
+    const [type, setType] = useState('');
 
     const isValidEmail = (email) => {
         return /\S+@\S+\.\S+/.test(email);
@@ -26,6 +27,17 @@ export default function CollectionInfo(props) {
 
     const changeTitle = (e) => {
         setTitle(e.target.value);
+    };
+
+    const changeType = (type, e) => {
+        setType(type);
+
+        // change the background color of the selected kind
+        let types = document.getElementsByClassName('type');
+        for (let i = 0; i < kinds.length; i++) {
+            types[i].style.backgroundColor = 'white';
+        }
+        e.target.style.backgroundColor = '#F2D7C0';
     };
 
     return (
