@@ -9,12 +9,14 @@ export default function CollectionInfo(props) {
     const [title, setTitle] = useState('');
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
-    const [type, setType] = useState('');
+    const [animalType, setAnimalType] = useState('');
 
+    // Validate email format with regex
     const isValidEmail = (email) => {
         return /\S+@\S+\.\S+/.test(email);
     };
 
+    // Handle email input change and set error message 
     const changeEmail = (e) => {
         if (!isValidEmail(e.target.value)) {
             setEmailError('Please enter a valid email address.');
@@ -25,17 +27,19 @@ export default function CollectionInfo(props) {
         setEmail(e.target.value);
     };
 
+    // Handle title input change
     const changeTitle = (e) => {
         setTitle(e.target.value);
     };
 
-    const changeType = (type, e) => {
-        setType(type);
+    // Update selected animal type and apply background color styling
+    const changeAnimalType = (animalType, e) => {
+        setAnimalType(animalType);
 
-        // change the background color of the selected kind
-        let types = document.getElementsByClassName('type');
-        for (let i = 0; i < kinds.length; i++) {
-            types[i].style.backgroundColor = 'white';
+        // Change the background color of the selected animal type
+        let typeButtons = document.getElementsByClassName('animal-type');
+        for (let i = 0; i < typeButtons.length; i++) {
+            typeButtons[i].style.backgroundColor = 'white';
         }
         e.target.style.backgroundColor = '#F2D7C0';
     };
@@ -53,7 +57,7 @@ export default function CollectionInfo(props) {
                     onChange={(e) => {
                         changeTitle(e);
                     }}
-                    placeholder='e.g., Our dog Poppy, max 20 characters'
+                    placeholder='e.g., Our dog Charlie, max 20 characters.'
                     maxLength={20}
                 />
             </div>
@@ -70,7 +74,7 @@ export default function CollectionInfo(props) {
                     onChange={(e) => {
                         changeEmail(e);
                     }}
-                    placeholder='All progress updates will be sent to your email'
+                    placeholder='All progress updates will be sent to your email.'
                 />
                 <div
                     style={{
@@ -84,6 +88,33 @@ export default function CollectionInfo(props) {
                     {emailError}
                 </div>
             </div>
+
+            <div className='input-field'>
+                <div className='input-info'>
+                    <label>Animal Type</label>{' '}
+                    <span>- Please select the type of the animal</span>
+                </div>
+                <div style={{ marginTop: '10px' }} className='animal-type-buttons'>
+                    <div
+                        className='animal-type'
+                        onClick={(e) => {
+                            changeAnimalType('dog', e);
+                        }}
+                    >
+                        Dog
+                    </div>
+                    <div
+                        style={{ marginLeft: '10px' }}
+                        className='animal-type'
+                        onClick={(e) => {
+                            changeAnimalType('cat', e);
+                        }}
+                    >
+                        Cat
+                    </div>
+                </div>
+            </div>
+
             <div className='input-field'>
                 <div className='input-info'>
                     <label>Photos</label>
