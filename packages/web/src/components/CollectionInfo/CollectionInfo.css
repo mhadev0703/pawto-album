@@ -54,6 +54,36 @@
     cursor: pointer;
 }
 
+input#agree-checkbox {
+    display: none;
+}
+
+input#agree-checkbox+label {
+    cursor: pointer;
+}
+
+.checkbox-label {
+    font-size: 20px;
+}
+
+input#agree-checkbox+label:before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 1px solid #000;
+    vertical-align: middle;
+    margin-right: 10px;
+    margin-top: -4px;
+}
+
+/* CSS for the checked state in label:before */
+input#agree-checkbox:checked+label:before {
+    content: '✔';
+    background-color: #f2d7c0;
+    text-align: center;
+}
+
 /* Mobile view */
 @media screen and (max-width: 768px) {
     .collection-info-container {
