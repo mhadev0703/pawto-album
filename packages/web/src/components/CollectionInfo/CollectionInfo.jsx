@@ -10,6 +10,7 @@ export default function CollectionInfo(props) {
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
     const [animalType, setAnimalType] = useState('');
+    const [isAgree, setIsAgree] = useState(false);
 
     // Validate email format with regex
     const isValidEmail = (email) => {
@@ -42,6 +43,11 @@ export default function CollectionInfo(props) {
             typeButtons[i].style.backgroundColor = 'white';
         }
         e.target.style.backgroundColor = '#F2D7C0';
+    };
+
+    // Handle checkbox change
+    const changeIsAgree = (e) => {
+        setIsAgree(e.target.checked);
     };
 
     return (
@@ -134,6 +140,19 @@ export default function CollectionInfo(props) {
                         );
                     })}
                 </div>
+            </div>
+            <div className='input-field'>
+                <input
+                    id='agree-checkbox'
+                    type='checkbox'
+                    value={isAgree}
+                    onChange={(e) => {
+                        changeIsAgree(e);
+                    }}
+                />
+                <label className='checkbox-label' htmlFor='agree-checkbox'>
+                    I agree to receive informational (non-promotional) emails
+                </label>
             </div>
         </div>
     );
