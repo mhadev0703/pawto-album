@@ -1,16 +1,40 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import './CollectionInfo.css';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+const REACT_APP_API_ADDRESS = import.meta.env.VITE_API_URL;
+// const REACT_APP_ADDRESS = import.meta.env.VITE_APP_URL;
+
 
 export default function CollectionInfo(props) {
     const croppedImages = props.croppedImages;
     const changeCroppingImageIndex = props.changeCroppingImageIndex;
+
+    let navigate = useNavigate();
 
     const [title, setTitle] = useState('');
     const [email, setEmail] = useState('');
     const [emailError, setEmailError] = useState('');
     const [animalType, setAnimalType] = useState('');
     const [isAgree, setIsAgree] = useState(false);
+    const [disabled, setDisabled] = useState(false);  // Disable the submit button if any of the required fields are invalid
+
+    // Check if the required fields are filled in
+    useEffect(() => {
+        if (
+            title === '' ||
+            email === '' ||
+            animalType === '' ||
+            !isAgree ||
+            !isValidEmail(email)
+        ) {
+            setDisabled(true);
+        } else {
+            setDisabled(false);
+        }
+    }, [title, email, kind, isAgree]);
 
     // Validate email format with regex
     const isValidEmail = (email) => {
@@ -48,6 +72,40 @@ export default function CollectionInfo(props) {
     // Handle checkbox change
     const changeIsAgree = (e) => {
         setIsAgree(e.target.checked);
+    };
+
+    // Save the collection data to the database
+    const saveData = (e) => {
+        e.preventDefault();
+        // remove 'data:image/jpeg;base64,' from the beginning of the string
+        for (let i = 0; i < croppedImages.length; i++) {
+            croppedImages[i] = croppedImages[i].replace(
+                /^data:image\/[a-z]+;base64,/,
+                ''
+            );
+        }
+
+        let url = `${REACT_APP_API_ADDRESS}/createCollection`;
+        let data = {
+            name: title,
+            email: email,
+            animalType: animalType,
+            images: croppedImages,
+        };
+
+        let config = { 'Content-Type': 'application/json' };
+        console.log(data);
+        axios
+            .post(url, data, config)
+            .then((res) => {
+                if (res.data.collectionId) {
+                    let newPath = '/order?collectionId=' + res.data.collectionId;
+                    navigate(newPath);
+                }
+            })
+            .catch((error) => {
+                console.log(error.response.data.message);
+            });
     };
 
     return (
@@ -153,6 +211,16 @@ export default function CollectionInfo(props) {
                 <label className='checkbox-label' htmlFor='agree-checkbox'>
                     I agree to receive informational (non-promotional) emails
                 </label>
+            </div>
+            <div className='center-button'>
+                <button
+                    disabled={disabled}
+                    onClick={(e) => {
+                        saveData(e);
+                    }}
+                >
+                    확인
+                </button>
             </div>
         </div>
     );
