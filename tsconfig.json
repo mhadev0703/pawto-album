@@ -1,8 +1,28 @@
 {
-  "extends": "@tsconfig/node18/tsconfig.json",
-  "exclude": ["packages"],
   "compilerOptions": {
-    "module": "esnext",
-    "moduleResolution": "node"
+
+    "target": "ESNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "experimentalDecorators": true,
+
+    "emitDecoratorMetadata": true,
+  },
+
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    },
+    "require": [
+      "tsconfig-paths/register"
+    ]
   }
 }
