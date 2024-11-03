@@ -46,6 +46,20 @@ button:hover,
   margin-top: 50px;
 }
 
+button:disabled {
+  background: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+.center-button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 /* Mobile View */
 @media screen and (max-width: 768px) {
   .App {
