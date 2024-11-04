@@ -8,6 +8,7 @@ import {
 } from '../../utils/utils';
 import ImageCropModal from '../../components/ImageCropModal/ImageCropModal';
 import CollectionInfo from '../../components/CollectionInfo/CollectionInfo';
+import Loading from '../../components/Loading/Loading';
 
 
 export default function Start() {
@@ -18,6 +19,7 @@ export default function Start() {
   const [offsetYs, setOffsetYs] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [croppingImageIndex, setCroppingImageIndex] = useState(0); // Index of the image being cropped
+  const [isLoading, setIsLoading] = useState(false);
 
 
   const onChangeUploadPhotos = async (e) => {
@@ -26,6 +28,7 @@ export default function Start() {
 
     // Ensure the number of uploaded files is between 8 and 20
     if (files.length > 7 && files.length < 21) {
+      setIsLoading(true);
       // If any HEIC files are uploaded, convert their image type to JPG
       let jpegFiles = await Promise.all(
         files.map((file) => {
@@ -64,6 +67,7 @@ export default function Start() {
       setCroppedImages(croppedImageArray);
       setOffsetXs(offsetXArray);
       setOffsetYs(offsetYArray);
+      setIsLoading(false);
     } else {
       alert('Please upload 8 to 20 photos.'); // If the number of files is out of range
     }
@@ -122,44 +126,50 @@ export default function Start() {
   };
 
   return (
-    <div className='App'>
-      <div>
-        <Header subHeading={subHeading()} />
-      </div>
-      <div className='container'>
-        {isUploaded ? (
-          <CollectionInfo
-            croppedImages={croppedImages}
-            changeCroppingImageIndex={changeCroppingImageIndex}
-          />
-        ) : (
+    <div>
+      {isLoading ? (
+        <Loading />
+      ) : (
+        <div className='App'>
           <div>
-            <label className='button' htmlFor='upload-photos'>
-              UPLOAD
-            </label>
-            <input
-              id='upload-photos'
-              type='file'
-              multiple
-              onChange={(e) => onChangeUploadPhotos(e)}
-              accept='image/x-png,image/jpeg,image/jpg,image/heic'
-            />
+            <Header subHeading={subHeading()} />
           </div>
-        )}
-        {showModal ? (
-          <ImageCropModal
-            originalImage={photos[croppingImageIndex]}
-            offsetXs={offsetXs}
-            offsetYs={offsetYs}
-            croppingImageIndex={croppingImageIndex}
-            changeCroppedImage={changeCroppedImage}
-            setShowModal={setShowModal}
-            setOffsetXs={setOffsetXs}
-            setOffsetYs={setOffsetYs}
-            deleteImageFromArray={deleteImageFromArray}
-          />
-        ) : null}
-      </div>
+          <div className='container'>
+            {isUploaded ? (
+              <CollectionInfo
+                croppedImages={croppedImages}
+                changeCroppingImageIndex={changeCroppingImageIndex}
+              />
+            ) : (
+              <div>
+                <label className='button' htmlFor='upload-photos'>
+                  UPLOAD
+                </label>
+                <input
+                  id='upload-photos'
+                  type='file'
+                  multiple
+                  onChange={(e) => onChangeUploadPhotos(e)}
+                  accept='image/x-png,image/jpeg,image/jpg,image/heic'
+                />
+              </div>
+            )}
+            {showModal ? (
+              <ImageCropModal
+                originalImage={photos[croppingImageIndex]}
+                offsetXs={offsetXs}
+                offsetYs={offsetYs}
+                croppingImageIndex={croppingImageIndex}
+                changeCroppedImage={changeCroppedImage}
+                setShowModal={setShowModal}
+                setOffsetXs={setOffsetXs}
+                setOffsetYs={setOffsetYs}
+                deleteImageFromArray={deleteImageFromArray}
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
