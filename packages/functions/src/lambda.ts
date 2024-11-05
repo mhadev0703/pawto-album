@@ -16,9 +16,50 @@ const BASE_PRICE = 2.99;
 export const handler = async (event: APIGatewayProxyEventV2) => {
     if (event.requestContext.http.method === 'GET') {
         if (event.rawPath === '/collections') {
+            // get item from collections table
+            const collectionId = event.queryStringParameters?.collectionId;
+
+            if (collectionId == undefined) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Invalid request body',
+                    }),
+                };
+            }
+
+            const params = {
+                Key: { collectionId: { S: collectionId } },
+                TableName: Table.Collections.tableName,
+            };
+
+            const { Item } = await dynamoDb.getItem(params);
+
+            if (!Item) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Collection ID does not exist.',
+                    }),
+                };
+            }
+
             return {
                 statusCode: 200,
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                    cStatus: Item.cStatus.N,
+                    name: Item.name.S,
+                    email: Item.email.S,
+                    createDatetime: Item.createDatetime.S,
+                    startDatetime: Item.startDatetime.S,
+                    endDatetime: Item.endDatetime.S,
+                    kind: Item.kind.S,
+                    paid: Item.paid.BOOL,
+                    price: Item.price.N,
+                    receipt: Item.receipt.S,
+                }),
             };
         } else if (event.rawPath === '/getImages') {
             return {
@@ -60,20 +101,20 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 const body = JSON.parse(event.body);
                 const email = body.email;
                 const images = body.images;
-                const kind = body.kind;
+                const animalType = body.animalType;
                 const name = body.name;
 
                 // get current time
                 const currentDatetime = new Date().toISOString();
                 const cStatus = 0;  // Collection status. 0: created, 1: processing, 2: completed, 3: error
 
-                if (!email || !images || !kind || !name) {
+                if (!email || !images || !animalType || !name) {
                     return {
                         statusCode: 400,
                         body: JSON.stringify({
                             error: true,
                             message:
-                                'Please provide all the required information: email, images, kind, and name.',
+                                'Please provide all the required information: email, images, animal type, and name.',
                         }),
                     };
                 }
@@ -96,7 +137,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 for (const image of images) {
                     const params = {
                         Bucket: Bucket.Uploads.bucketName,
-                        Key: `${collectionId}/sks/sks (${i}).jpg`,  
+                        Key: `${collectionId}/sks/sks (${i}).jpg`,
                         Body: Buffer.from(image, 'base64'),
                         ContentEncoding: 'base64',
                         ContentType: 'image/jpeg',
@@ -127,7 +168,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                         startDatetime: { S: '' },
                         endDatetime: { S: '' },
                         paymentKey: { S: '' },
-                        kind: { S: kind },
+                        animalType: { S: animalType },
                         paid: { BOOL: false },
                         price: { N: BASE_PRICE.toString() },
                         secretKey: { S: secretKey },
