@@ -1,0 +1,31 @@
+.table-container {
+    padding: 30px;
+}
+
+.table-title {
+    font-weight: 500;
+    font-size: 25px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #000;
+    text-align: left;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.table-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.table-col {
+    font-weight: 400;
+    font-size: 20px;
+}
+
+/* Mobile View */
+@media screen and (max-width: 768px) {
+    .table-container {
+        padding: 10px;
+    }
+}
