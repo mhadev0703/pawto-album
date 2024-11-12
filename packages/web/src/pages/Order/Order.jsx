@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Loading from '../../components/Loading/Loading';
 import Header from '../../components/Header/Header';
+import Table from '../../components/Table/Table';
 
 const REACT_APP_API_ADDRESS = import.meta.env.VITE_API_URL;
 const REACT_APP_ADDRESS = import.meta.env.VITE_APP_URL;
@@ -27,12 +28,39 @@ export default function Order() {
     startDatetime: '',
   });
   const [paidStatus, setPaidStatus] = useState(false);
+  const [productInfoData, setProductInfoData] = useState([]);
+  const [paymentInfoData, setPaymentInfoData] = useState([]);
+  const [price, setPrice] = useState(2.99);
 
   useEffect(() => {
     if (collectionId !== null) {
       checkPaidStatus();
     }
   }, []);  // Run only once
+
+  useEffect(() => {
+    setProductInfoData([
+      {
+        title: 'Name',
+        content: collectionData.name,
+      },
+      {
+        title: 'Animal Type',
+        content:
+          collectionData.animalType === 'dog'
+            ? 'Dog'
+            : collectionData.animalType === 'cat'
+              ? 'Cat'
+              : '',
+      },
+      {
+        title: 'Email',
+        content: collectionData.email,
+      },
+    ]);
+
+    setPaymentInfoData([{ title: 'TOTAL', content: `${price}` }]);
+  }, [collectionData, price]);
 
   const checkPaidStatus = async () => {
     setIsLoading(true);
@@ -49,7 +77,7 @@ export default function Order() {
             return;
           } else {
             setCollectionData(res.data);
-            
+
             let collectionStatus = parseInt(res.data.collectionStatus);
 
             if (collectionStatus === 0 || collectionStatus === 4) {
