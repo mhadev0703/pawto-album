@@ -60,6 +60,10 @@ button:disabled {
   width: 100%;
 }
 
+.content-wrapper {
+  width: 100%;
+}
+
 /* Mobile View */
 @media screen and (max-width: 768px) {
   .App {

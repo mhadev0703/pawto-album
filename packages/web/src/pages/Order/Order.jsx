@@ -27,6 +27,7 @@ export default function Order() {
     receipt: '',
     startDatetime: '',
   });
+
   const [paidStatus, setPaidStatus] = useState(false);
   const [productInfoData, setProductInfoData] = useState([]);
   const [paymentInfoData, setPaymentInfoData] = useState([]);
@@ -38,6 +39,7 @@ export default function Order() {
     }
   }, []);  // Run only once
 
+  // Set the product and payment information
   useEffect(() => {
     setProductInfoData([
       {
@@ -59,7 +61,7 @@ export default function Order() {
       },
     ]);
 
-    setPaymentInfoData([{ title: 'TOTAL', content: `${price}` }]);
+    setPaymentInfoData([{ title: 'TOTAL', content: `$${price}` }]);
   }, [collectionData, price]);
 
   const checkPaidStatus = async () => {
@@ -117,8 +119,21 @@ export default function Order() {
                 Please check the link sent to your email to track the status of your order.
               </div>
             ) : (
-              <div className='center-button'>
-                <button>CHECKOUT</button>
+              <div className='content-wrapper'>
+                <Table
+                  tableTitle={'product info'}
+                  tableContent={productInfoData}
+                />
+                <Table
+                  tableTitle={'payment info'}
+                  tableContent={paymentInfoData}
+                />
+                <div
+                  style={{ margin: '40px 0' }}
+                  className='center-button'
+                >
+                  <button>CHECKOUT</button>
+                </div>
               </div>
             )}
           </div>
