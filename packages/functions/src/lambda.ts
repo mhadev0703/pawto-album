@@ -55,7 +55,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     createDatetime: Item.createDatetime.S,
                     startDatetime: Item.startDatetime.S,
                     endDatetime: Item.endDatetime.S,
-                    kind: Item.kind.S,
+                    animalType: Item.animalType.S,
                     paid: Item.paid.BOOL,
                     price: Item.price.N,
                     receipt: Item.receipt.S,
@@ -106,7 +106,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
 
                 // get current time
                 const currentDatetime = new Date().toISOString();
-                const cStatus = 0;  // Collection status. 0: created, 1: processing, 2: completed, 3: error
+                const collectionStatus = 0;  // Collection status. 0: created, 1: processing, 2: completed, 3: error
 
                 if (!email || !images || !animalType || !name) {
                     return {
@@ -163,7 +163,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                         collectionId: { S: collectionId },
                         email: { S: email },
                         name: { S: name },
-                        cStatus: { N: cStatus.toString() },
+                        collectionStatus: { N: collectionStatus.toString() },
                         createDatetime: { S: currentDatetime },
                         startDatetime: { S: '' },
                         endDatetime: { S: '' },

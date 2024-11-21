@@ -34,7 +34,7 @@ export default function CollectionInfo(props) {
         } else {
             setDisabled(false);
         }
-    }, [title, email, kind, isAgree]);
+    }, [title, email, animalType, isAgree]);
 
     // Validate email format with regex
     const isValidEmail = (email) => {
@@ -219,7 +219,7 @@ export default function CollectionInfo(props) {
                         saveData(e);
                     }}
                 >
-                    확인
+                    Confirm
                 </button>
             </div>
         </div>
