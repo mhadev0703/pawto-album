@@ -49,7 +49,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
             return {
                 statusCode: 200,
                 body: JSON.stringify({
-                    cStatus: Item.cStatus.N,
+                    collectionStatus: Item.collectionStatus.N,
                     name: Item.name.S,
                     email: Item.email.S,
                     createDatetime: Item.createDatetime.S,
