@@ -26,12 +26,16 @@ export function API({ stack }: StackContext) {
     });
 
     const SENDER_EMAIL = new Config.Secret(stack, 'SENDER_EMAIL'); 
+    const TOSS_PAYMENTS_API_KEY = new Config.Secret(
+        stack,
+        'TOSS_PAYMENTS_API_KEY'
+    );
 
     const api = new Api(stack, 'pawto-album', {
         cors: true,  // Enable CORS
         defaults: {
             function: {
-                bind: [UploadsBucket, CollectionsTable, SENDER_EMAIL],  // Bind the resources to the function
+                bind: [UploadsBucket, CollectionsTable, SENDER_EMAIL, TOSS_PAYMENTS_API_KEY],  // Bind the resources to the function
             },
         },
         routes: {
