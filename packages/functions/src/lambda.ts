@@ -193,9 +193,159 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     }),
                 };
             } else if (event.rawPath === '/payment') {
+                // Get data from request body
+                if (event.body == undefined) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Invalid request body',
+                        }),
+                    };
+                }
+                const body = JSON.parse(event.body);
+                const collectionId = body.collectionId;
+                const paymentKey = body.paymentKey;
+                const price = body.price;
+
+                // Logs
+                console.log('TRYING TO PAYMENT CONFIRM: ');
+                console.log('collectionId: ', collectionId);
+                console.log('PAYMENTKEY: ', paymentKey);
+                console.log('PRICE: ', price);
+
+                // Get data from the collections table
+                const params = {
+                    Key: { collectionId: { S: collectionId } },
+                    TableName: Table.Collections.tableName,
+                };
+
+                const { Item } = await dynamoDb.getItem(params);
+
+                // Check if the collection exists
+                if (
+                    !Item ||
+                    Item.email.S == undefined ||
+                    Item.name.S == undefined ||
+                    Item.secretKey.S == undefined
+                ) {
+                    return {
+                        statusCode: 404,
+                        body: JSON.stringify({
+                            error: true,
+                            message:
+                                'Could not find collection with provided "collectionId"',
+                        }),
+                    };
+                }
+
+                // Check if already paid
+                if (Item.paid.BOOL == true) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Already paid',
+                        }),
+                    };
+                }
+
+                // Check if price is correct
+                if (BASE_PRICE != parseInt(price)) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Price is not correct',
+                        }),
+                    };
+                }
+
+                // Confirm to toss payment api
+                let receipt = '';
+                let url = 'https://api.tosspayments.com/v1/payments/confirm';
+
+                // Basic auth header for toss payment api 
+                let headers = {
+                    'Content-Type': 'application/json',
+                    Authorization:
+                        'Basic ' +
+                        Buffer.from(Config.TOSS_PAYMENTS_API_KEY + ':').toString(
+                            'base64'
+                        ),
+                };
+                let data = {
+                    paymentKey: paymentKey,
+                    amount: price,
+                    orderId: collectionId,
+                };
+
+                let response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(data),
+                });
+                
+                if (response.status != 200) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Payment is not confirmed',
+                        }),
+                    };
+                }
+                
+                const responseJson = (await response.json()) as any;
+                if (responseJson?.receipt == undefined) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Payment is not confirmed',
+                        }),
+                    };
+                }
+                receipt = responseJson?.receipt.url;
+
+                // Update payment status to true, and enter paymentKey and price
+                await dynamoDb.updateItem({
+                    TableName: Table.Collections.tableName,
+                    Key: { collectionId: { S: collectionId } },
+                    UpdateExpression:
+                        'set paid = :p, paymentKey = :pk, price = :pr, receipt = :r',
+                    ExpressionAttributeValues: {
+                        ':p': { BOOL: true },
+                        ':pk': { S: paymentKey },
+                        ':pr': { N: price },
+                        ':r': { S: receipt },
+                    },
+                });
+
+                // Send email for payment complete
+                await sendEmail(
+                    'paymentComplete',
+                    Item.email.S,
+                    Item.name.S,
+                    collectionId,
+                    Item.secretKey.S
+                );
+
+                // Send email for alerting payment completetion 
+                await sendEmail(
+                    'paymentCompleteAlert',
+                    Item.email.S,
+                    Item.name.S,
+                    collectionId,
+                    Item.secretKey.S
+                );
+
                 return {
                     statusCode: 200,
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({
+                        receipt: receipt,
+                        secretKey: Item.secretKey.S,
+                    }),
                 };
             } else if (event.rawPath === '/execBanana') {
                 return {
