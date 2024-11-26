@@ -285,7 +285,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     headers: headers,
                     body: JSON.stringify(data),
                 });
-                
+
                 if (response.status != 200) {
                     return {
                         statusCode: 400,
@@ -295,7 +295,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                         }),
                     };
                 }
-                
+
                 const responseJson = (await response.json()) as any;
                 if (responseJson?.receipt == undefined) {
                     return {
@@ -348,6 +348,78 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     }),
                 };
             } else if (event.rawPath === '/execBanana') {
+                if (event.body == undefined) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Invalid request body',
+                        }),
+                    };
+                }
+                const body = JSON.parse(event.body);
+                const collectionId = body.collectionId;
+
+                console.log('EXEC BANANA: ', collectionId);
+
+                // get data from collections table
+                const params = {
+                    Key: { collectionId: { S: collectionId } },
+                    TableName: Table.Collections.tableName,
+                };
+
+                const { Item } = await dynamoDb.getItem(params);
+
+                if (
+                    !Item ||
+                    Item.email.S == undefined ||
+                    Item.secretKey.S == undefined ||
+                    Item.kind.S == undefined
+                ) {
+                    return {
+                        statusCode: 404,
+                        body: JSON.stringify({
+                            error: true,
+                            message:
+                                'Could not find collection with provided "collectionId"',
+                        }),
+                    };
+                }
+
+                const kind = Item.kind.S;
+                const secretKey = Item.secretKey.S;
+
+                // check is paid and cStatus == 0
+                if (Item.paid.BOOL == false) {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Not paid',
+                        }),
+                    };
+                }
+
+                if (Item.cStatus.N != '0') {
+                    return {
+                        statusCode: 400,
+                        body: JSON.stringify({
+                            error: true,
+                            message: 'Already executed',
+                        }),
+                    };
+                }
+
+                // update cStatus to 1
+                await dynamoDb.updateItem({
+                    TableName: Table.Collections.tableName,
+                    Key: { collectionId: { S: collectionId } },
+                    UpdateExpression: 'set collectionStatus = :p',
+                    ExpressionAttributeValues: {
+                        ':p': { N: '1' },
+                    },
+                });
+
                 return {
                     statusCode: 200,
                     body: JSON.stringify({}),
