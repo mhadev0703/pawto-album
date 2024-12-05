@@ -11,7 +11,8 @@ const dynamoDb = new DynamoDB({ region: 'us-east-1' });
 const s3 = new S3({ region: 'us-east-1' });
 
 const ses = new SESClient({ region: 'us-east-1' });
-const BASE_PRICE = 2.99;
+//const BASE_PRICE = 2.99;
+const BASE_PRICE = 3900;
 
 export const handler = async (event: APIGatewayProxyEventV2) => {
     if (event.requestContext.http.method === 'GET') {
@@ -374,7 +375,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     !Item ||
                     Item.email.S == undefined ||
                     Item.secretKey.S == undefined ||
-                    Item.kind.S == undefined
+                    Item.animalType.S == undefined
                 ) {
                     return {
                         statusCode: 404,
@@ -386,10 +387,10 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     };
                 }
 
-                const kind = Item.kind.S;
+                const animalType = Item.animalType.S;
                 const secretKey = Item.secretKey.S;
 
-                // check is paid and cStatus == 0
+                // check is paid and collectionStatus == 0
                 if (Item.paid.BOOL == false) {
                     return {
                         statusCode: 400,
@@ -400,7 +401,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     };
                 }
 
-                if (Item.cStatus.N != '0') {
+                if (Item.collectionStatus.N != '0') {
                     return {
                         statusCode: 400,
                         body: JSON.stringify({
@@ -410,7 +411,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     };
                 }
 
-                // update cStatus to 1
+                // update collectionStatus to 1
                 await dynamoDb.updateItem({
                     TableName: Table.Collections.tableName,
                     Key: { collectionId: { S: collectionId } },
