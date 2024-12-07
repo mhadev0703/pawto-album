@@ -348,7 +348,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                         secretKey: Item.secretKey.S,
                     }),
                 };
-            } else if (event.rawPath === '/execBanana') {
+            } else if (event.rawPath === '/execPod') {
                 if (event.body == undefined) {
                     return {
                         statusCode: 400,
@@ -361,7 +361,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 const body = JSON.parse(event.body);
                 const collectionId = body.collectionId;
 
-                console.log('EXEC BANANA: ', collectionId);
+                console.log('EXEC RunPod: ', collectionId);
 
                 // get data from collections table
                 const params = {
@@ -421,9 +421,64 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                     },
                 });
 
+                const inputs = {
+                    input: {
+                        collection_id: collectionId,
+                        animalType: animalType,
+                        secret_key: secretKey,
+                        n_save_sample: 20, // Number of samples to generate
+                        save_sample_negative_prompt:
+                            'frame, paper, letter, signature, keen eyes, two heads, siamese, two tongues, logo, half man half beast, three legs, too vivid, too realistic',
+                        save_guidance_scale: 8.5,
+                        num_class_images: 200, // Number of images for model training
+                        steps: 400, // This can be increased for longer training
+                        art_styles: [
+                            // Create a list of art styles to generate
+                            `oil painting portrait of a ((zwx ${animalType})), face shot`,
+                            `oil painting portrait of a ((zwx ${animalType})), full body shot`,
+                        ],
+                    },
+                };
+
+                // When not running RunPod, set runit to false
+                const runit = true;
+                let outJson = {} as any;
+                if (runit) {
+                    // Codes to run RunPod
+                    const header = {
+                        'Content-Type': 'application/json',
+                        authorization: 'runpodApiKey',
+                    };
+                    let url = 'https://api.runpod.ai/v2/[serverlessid]/run';
+
+                    let response = await fetch(url, {
+                        method: 'POST',
+                        headers: header,
+                        body: JSON.stringify(inputs),
+                    });
+
+                    outJson = await response.json();
+                    const outId = outJson?.id;
+                    try {
+                        url = `https://api.runpod.ai/v2/[serverlessid]/status/${outId}`;
+                        response = await fetch(url, {
+                            method: 'POST',
+                            headers: header,
+                            body: JSON.stringify(inputs),
+                        });
+                        const outStatus = (await response.json()) as any;
+                    } catch (error) {
+                        console.log('STATUS_TIMEOUT');
+                    }
+                } else {
+                    outJson = { result: 'success' };
+                }
+
                 return {
                     statusCode: 200,
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({
+                        outJson: outJson,
+                    }),
                 };
             } else if (event.rawPath === '/checkStartDatetime') {
                 return {
