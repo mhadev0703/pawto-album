@@ -82,427 +82,421 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 statusCode: 200,
                 body: JSON.stringify({}),
             };
-        } else if (event.requestContext.http.method === 'POST') {
-            if (event.rawPath === '/updateCollectionStatus') {
+        } else if (event.rawPath === '/createCollection') {
+            const collectionId = uuidv4();
+            if (event.body == undefined) {
                 return {
-                    statusCode: 200,
-                    body: JSON.stringify({}),
-                };
-            } else if (event.rawPath === '/createCollection') {
-                const collectionId = uuidv4();
-                if (event.body == undefined) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Invalid request body',
-                        }),
-                    };
-                }
-                const body = JSON.parse(event.body);
-                const email = body.email;
-                const images = body.images;
-                const animalType = body.animalType;
-                const name = body.name;
-
-                // get current time
-                const currentDatetime = new Date().toISOString();
-                const collectionStatus = 0;  // Collection status. 0: created, 1: processing, 2: completed, 3: error
-
-                if (!email || !images || !animalType || !name) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message:
-                                'Please provide all the required information: email, images, animal type, and name.',
-                        }),
-                    };
-                }
-
-                // Check email format with regex
-                var re = /\S+@\S+\.\S+/;
-                if (!re.test(email)) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Please provide valid email',
-                        }),
-                    };
-                }
-
-                // Save images to s3
-                let i = 0;
-
-                for (const image of images) {
-                    const params = {
-                        Bucket: Bucket.Uploads.bucketName,
-                        Key: `${collectionId}/sks/sks (${i}).jpg`,
-                        Body: Buffer.from(image, 'base64'),
-                        ContentEncoding: 'base64',
-                        ContentType: 'image/jpeg',
-                        // ACL: 'public-read',
-                    };
-                    await s3.putObject(params);
-                    i += 1;
-                }
-
-                // Characters to choose from
-                const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-                // Generate 6-digit secret key with lowercase letters and numbers
-                let secretKey = '';
-                for (let i = 0; i < 6; i++) {
-                    secretKey += chars[Math.floor(Math.random() * chars.length)];
-                }
-
-                // Save collection to DynamoDB
-                await dynamoDb.putItem({
-                    TableName: Table.Collections.tableName,
-                    Item: {
-                        collectionId: { S: collectionId },
-                        email: { S: email },
-                        name: { S: name },
-                        collectionStatus: { N: collectionStatus.toString() },
-                        createDatetime: { S: currentDatetime },
-                        startDatetime: { S: '' },
-                        endDatetime: { S: '' },
-                        paymentKey: { S: '' },
-                        animalType: { S: animalType },
-                        paid: { BOOL: false },
-                        price: { N: BASE_PRICE.toString() },
-                        secretKey: { S: secretKey },
-                        receipt: { S: '' },
-                    },
-                });
-
-                // Send email with template collectionCreated
-                await sendEmail(
-                    'collectionCreated',
-                    email,
-                    name,
-                    collectionId,
-                    secretKey
-                );
-
-                return {
-                    statusCode: 200,
+                    statusCode: 400,
                     body: JSON.stringify({
-                        collectionId: collectionId,
-                        email: email,
+                        error: true,
+                        message: 'Invalid request body',
                     }),
                 };
-            } else if (event.rawPath === '/payment') {
-                // Get data from request body
-                if (event.body == undefined) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Invalid request body',
-                        }),
-                    };
-                }
-                const body = JSON.parse(event.body);
-                const collectionId = body.collectionId;
-                const paymentKey = body.paymentKey;
-                const price = body.price;
+            }
+            const body = JSON.parse(event.body);
+            const email = body.email;
+            const images = body.images;
+            const animalType = body.animalType;
+            const name = body.name;
 
-                // Logs
-                console.log('TRYING TO PAYMENT CONFIRM: ');
-                console.log('collectionId: ', collectionId);
-                console.log('PAYMENTKEY: ', paymentKey);
-                console.log('PRICE: ', price);
+            // get current time
+            const currentDatetime = new Date().toISOString();
+            const collectionStatus = 0;  // Collection status. 0: created, 1: processing, 2: completed, 3: error
 
-                // Get data from the collections table
+            if (!email || !images || !animalType || !name) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Please provide all the required information: email, images, animal type, and name.',
+                    }),
+                };
+            }
+
+            // Check email format with regex
+            var re = /\S+@\S+\.\S+/;
+            if (!re.test(email)) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Please provide valid email',
+                    }),
+                };
+            }
+
+            // Save images to s3
+            let i = 0;
+
+            for (const image of images) {
                 const params = {
-                    Key: { collectionId: { S: collectionId } },
-                    TableName: Table.Collections.tableName,
+                    Bucket: Bucket.Uploads.bucketName,
+                    Key: `${collectionId}/sks/sks (${i}).jpg`,
+                    Body: Buffer.from(image, 'base64'),
+                    ContentEncoding: 'base64',
+                    ContentType: 'image/jpeg',
+                    // ACL: 'public-read',
                 };
+                await s3.putObject(params);
+                i += 1;
+            }
 
-                const { Item } = await dynamoDb.getItem(params);
+            // Characters to choose from
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
-                // Check if the collection exists
-                if (
-                    !Item ||
-                    Item.email.S == undefined ||
-                    Item.name.S == undefined ||
-                    Item.secretKey.S == undefined
-                ) {
-                    return {
-                        statusCode: 404,
-                        body: JSON.stringify({
-                            error: true,
-                            message:
-                                'Could not find collection with provided "collectionId"',
-                        }),
-                    };
-                }
+            // Generate 6-digit secret key with lowercase letters and numbers
+            let secretKey = '';
+            for (let i = 0; i < 6; i++) {
+                secretKey += chars[Math.floor(Math.random() * chars.length)];
+            }
 
-                // Check if already paid
-                if (Item.paid.BOOL == true) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Already paid',
-                        }),
-                    };
-                }
+            // Save collection to DynamoDB
+            await dynamoDb.putItem({
+                TableName: Table.Collections.tableName,
+                Item: {
+                    collectionId: { S: collectionId },
+                    email: { S: email },
+                    name: { S: name },
+                    collectionStatus: { N: collectionStatus.toString() },
+                    createDatetime: { S: currentDatetime },
+                    startDatetime: { S: '' },
+                    endDatetime: { S: '' },
+                    paymentKey: { S: '' },
+                    animalType: { S: animalType },
+                    paid: { BOOL: false },
+                    price: { N: BASE_PRICE.toString() },
+                    secretKey: { S: secretKey },
+                    receipt: { S: '' },
+                },
+            });
 
-                // Check if price is correct
-                if (BASE_PRICE != parseInt(price)) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Price is not correct',
-                        }),
-                    };
-                }
+            // Send email with template collectionCreated
+            await sendEmail(
+                'collectionCreated',
+                email,
+                name,
+                collectionId,
+                secretKey
+            );
 
-                // Confirm to toss payment api
-                let receipt = '';
-                let url = 'https://api.tosspayments.com/v1/payments/confirm';
+            return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    collectionId: collectionId,
+                    email: email,
+                }),
+            };
+        } else if (event.rawPath === '/payment') {
+            // Get data from request body
+            if (event.body == undefined) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Invalid request body',
+                    }),
+                };
+            }
+            const body = JSON.parse(event.body);
+            const collectionId = body.collectionId;
+            const paymentKey = body.paymentKey;
+            const price = body.price;
 
-                // Basic auth header for toss payment api 
-                let headers = {
+            // Logs
+            console.log('TRYING TO PAYMENT CONFIRM: ');
+            console.log('collectionId: ', collectionId);
+            console.log('PAYMENTKEY: ', paymentKey);
+            console.log('PRICE: ', price);
+
+            // Get data from the collections table
+            const params = {
+                Key: { collectionId: { S: collectionId } },
+                TableName: Table.Collections.tableName,
+            };
+
+            const { Item } = await dynamoDb.getItem(params);
+
+            // Check if the collection exists
+            if (
+                !Item ||
+                Item.email.S == undefined ||
+                Item.name.S == undefined ||
+                Item.secretKey.S == undefined
+            ) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided "collectionId"',
+                    }),
+                };
+            }
+
+            // Check if already paid
+            if (Item.paid.BOOL == true) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Already paid',
+                    }),
+                };
+            }
+
+            // Check if price is correct
+            if (BASE_PRICE != parseInt(price)) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Price is not correct',
+                    }),
+                };
+            }
+
+            // Confirm to toss payment api
+            let receipt = '';
+            let url = 'https://api.tosspayments.com/v1/payments/confirm';
+
+            // Basic auth header for toss payment api 
+            let headers = {
+                'Content-Type': 'application/json',
+                Authorization:
+                    'Basic ' +
+                    Buffer.from(Config.TOSS_PAYMENTS_API_KEY + ':').toString(
+                        'base64'
+                    ),
+            };
+            let data = {
+                paymentKey: paymentKey,
+                amount: price,
+                orderId: collectionId,
+            };
+
+            let response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(data),
+            });
+
+            if (response.status != 200) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Payment is not confirmed',
+                    }),
+                };
+            }
+
+            const responseJson = (await response.json()) as any;
+            if (responseJson?.receipt == undefined) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Payment is not confirmed',
+                    }),
+                };
+            }
+            receipt = responseJson?.receipt.url;
+
+            // Update payment status to true, and enter paymentKey and price
+            await dynamoDb.updateItem({
+                TableName: Table.Collections.tableName,
+                Key: { collectionId: { S: collectionId } },
+                UpdateExpression:
+                    'set paid = :p, paymentKey = :pk, price = :pr, receipt = :r',
+                ExpressionAttributeValues: {
+                    ':p': { BOOL: true },
+                    ':pk': { S: paymentKey },
+                    ':pr': { N: price },
+                    ':r': { S: receipt },
+                },
+            });
+
+            // Send email for payment complete
+            await sendEmail(
+                'paymentComplete',
+                Item.email.S,
+                Item.name.S,
+                collectionId,
+                Item.secretKey.S
+            );
+
+            // Send email for alerting payment completetion 
+            await sendEmail(
+                'paymentCompleteAlert',
+                Item.email.S,
+                Item.name.S,
+                collectionId,
+                Item.secretKey.S
+            );
+
+            return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    receipt: receipt,
+                    secretKey: Item.secretKey.S,
+                }),
+            };
+        } else if (event.rawPath === '/execPod') {
+            if (event.body == undefined) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Invalid request body',
+                    }),
+                };
+            }
+            const body = JSON.parse(event.body);
+            const collectionId = body.collectionId;
+
+            console.log('EXEC RunPod: ', collectionId);
+
+            // get data from collections table
+            const params = {
+                Key: { collectionId: { S: collectionId } },
+                TableName: Table.Collections.tableName,
+            };
+
+            const { Item } = await dynamoDb.getItem(params);
+
+            if (
+                !Item ||
+                Item.email.S == undefined ||
+                Item.secretKey.S == undefined ||
+                Item.animalType.S == undefined
+            ) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided "collectionId"',
+                    }),
+                };
+            }
+
+            const animalType = Item.animalType.S;
+            const secretKey = Item.secretKey.S;
+
+            // check is paid and collectionStatus == 0
+            if (Item.paid.BOOL == false) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Not paid',
+                    }),
+                };
+            }
+
+            if (Item.collectionStatus.N != '0') {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Already executed',
+                    }),
+                };
+            }
+
+            // update collectionStatus to 1
+            await dynamoDb.updateItem({
+                TableName: Table.Collections.tableName,
+                Key: { collectionId: { S: collectionId } },
+                UpdateExpression: 'set collectionStatus = :p',
+                ExpressionAttributeValues: {
+                    ':p': { N: '1' },
+                },
+            });
+
+            const inputs = {
+                input: {
+                    collection_id: collectionId,
+                    animalType: animalType,
+                    secret_key: secretKey,
+                    n_save_sample: 20, // Number of samples to generate
+                    save_sample_negative_prompt:
+                        'frame, paper, letter, signature, keen eyes, two heads, siamese, two tongues, logo, half man half beast, three legs, too vivid, too realistic',
+                    save_guidance_scale: 8.5,
+                    num_class_images: 200, // Number of images for model training
+                    steps: 400, // This can be increased for longer training
+                    art_styles: [
+                        // Create a list of art styles to generate
+                        `oil painting portrait of a ((zwx ${animalType})), face shot`,
+                        `oil painting portrait of a ((zwx ${animalType})), full body shot`,
+                    ],
+                },
+            };
+
+            // When not running RunPod, set runit to false
+            const runit = true;
+            let outJson = {} as any;
+            if (runit) {
+                // Codes to run RunPod
+                const header = {
                     'Content-Type': 'application/json',
-                    Authorization:
-                        'Basic ' +
-                        Buffer.from(Config.TOSS_PAYMENTS_API_KEY + ':').toString(
-                            'base64'
-                        ),
+                    authorization: 'runpodApiKey',
                 };
-                let data = {
-                    paymentKey: paymentKey,
-                    amount: price,
-                    orderId: collectionId,
-                };
+                let url = 'https://api.runpod.ai/v2/[serverlessid]/run';
 
                 let response = await fetch(url, {
                     method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(data),
+                    headers: header,
+                    body: JSON.stringify(inputs),
                 });
 
-                if (response.status != 200) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Payment is not confirmed',
-                        }),
-                    };
-                }
-
-                const responseJson = (await response.json()) as any;
-                if (responseJson?.receipt == undefined) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Payment is not confirmed',
-                        }),
-                    };
-                }
-                receipt = responseJson?.receipt.url;
-
-                // Update payment status to true, and enter paymentKey and price
-                await dynamoDb.updateItem({
-                    TableName: Table.Collections.tableName,
-                    Key: { collectionId: { S: collectionId } },
-                    UpdateExpression:
-                        'set paid = :p, paymentKey = :pk, price = :pr, receipt = :r',
-                    ExpressionAttributeValues: {
-                        ':p': { BOOL: true },
-                        ':pk': { S: paymentKey },
-                        ':pr': { N: price },
-                        ':r': { S: receipt },
-                    },
-                });
-
-                // Send email for payment complete
-                await sendEmail(
-                    'paymentComplete',
-                    Item.email.S,
-                    Item.name.S,
-                    collectionId,
-                    Item.secretKey.S
-                );
-
-                // Send email for alerting payment completetion 
-                await sendEmail(
-                    'paymentCompleteAlert',
-                    Item.email.S,
-                    Item.name.S,
-                    collectionId,
-                    Item.secretKey.S
-                );
-
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({
-                        receipt: receipt,
-                        secretKey: Item.secretKey.S,
-                    }),
-                };
-            } else if (event.rawPath === '/execPod') {
-                if (event.body == undefined) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Invalid request body',
-                        }),
-                    };
-                }
-                const body = JSON.parse(event.body);
-                const collectionId = body.collectionId;
-
-                console.log('EXEC RunPod: ', collectionId);
-
-                // get data from collections table
-                const params = {
-                    Key: { collectionId: { S: collectionId } },
-                    TableName: Table.Collections.tableName,
-                };
-
-                const { Item } = await dynamoDb.getItem(params);
-
-                if (
-                    !Item ||
-                    Item.email.S == undefined ||
-                    Item.secretKey.S == undefined ||
-                    Item.animalType.S == undefined
-                ) {
-                    return {
-                        statusCode: 404,
-                        body: JSON.stringify({
-                            error: true,
-                            message:
-                                'Could not find collection with provided "collectionId"',
-                        }),
-                    };
-                }
-
-                const animalType = Item.animalType.S;
-                const secretKey = Item.secretKey.S;
-
-                // check is paid and collectionStatus == 0
-                if (Item.paid.BOOL == false) {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Not paid',
-                        }),
-                    };
-                }
-
-                if (Item.collectionStatus.N != '0') {
-                    return {
-                        statusCode: 400,
-                        body: JSON.stringify({
-                            error: true,
-                            message: 'Already executed',
-                        }),
-                    };
-                }
-
-                // update collectionStatus to 1
-                await dynamoDb.updateItem({
-                    TableName: Table.Collections.tableName,
-                    Key: { collectionId: { S: collectionId } },
-                    UpdateExpression: 'set collectionStatus = :p',
-                    ExpressionAttributeValues: {
-                        ':p': { N: '1' },
-                    },
-                });
-
-                const inputs = {
-                    input: {
-                        collection_id: collectionId,
-                        animalType: animalType,
-                        secret_key: secretKey,
-                        n_save_sample: 20, // Number of samples to generate
-                        save_sample_negative_prompt:
-                            'frame, paper, letter, signature, keen eyes, two heads, siamese, two tongues, logo, half man half beast, three legs, too vivid, too realistic',
-                        save_guidance_scale: 8.5,
-                        num_class_images: 200, // Number of images for model training
-                        steps: 400, // This can be increased for longer training
-                        art_styles: [
-                            // Create a list of art styles to generate
-                            `oil painting portrait of a ((zwx ${animalType})), face shot`,
-                            `oil painting portrait of a ((zwx ${animalType})), full body shot`,
-                        ],
-                    },
-                };
-
-                // When not running RunPod, set runit to false
-                const runit = true;
-                let outJson = {} as any;
-                if (runit) {
-                    // Codes to run RunPod
-                    const header = {
-                        'Content-Type': 'application/json',
-                        authorization: 'runpodApiKey',
-                    };
-                    let url = 'https://api.runpod.ai/v2/[serverlessid]/run';
-
-                    let response = await fetch(url, {
+                outJson = await response.json();
+                const outId = outJson?.id;
+                try {
+                    url = `https://api.runpod.ai/v2/[serverlessid]/status/${outId}`;
+                    response = await fetch(url, {
                         method: 'POST',
                         headers: header,
                         body: JSON.stringify(inputs),
                     });
-
-                    outJson = await response.json();
-                    const outId = outJson?.id;
-                    try {
-                        url = `https://api.runpod.ai/v2/[serverlessid]/status/${outId}`;
-                        response = await fetch(url, {
-                            method: 'POST',
-                            headers: header,
-                            body: JSON.stringify(inputs),
-                        });
-                        const outStatus = (await response.json()) as any;
-                    } catch (error) {
-                        console.log('STATUS_TIMEOUT');
-                    }
-                } else {
-                    outJson = { result: 'success' };
+                    const outStatus = (await response.json()) as any;
+                } catch (error) {
+                    console.log('STATUS_TIMEOUT');
                 }
-
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({
-                        outJson: outJson,
-                    }),
-                };
-            } else if (event.rawPath === '/checkStartDatetime') {
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({}),
-                };
-            } else if (event.rawPath === '/cancelPayment') {
-                return {
-                    statusCode: 200,
-                    body: JSON.stringify({}),
-                };
             } else {
-                return {
-                    statusCode: 404,
-                    body: 'Hello world. This is a bad request.',
-                };
+                outJson = { result: 'success' };
             }
+
+            return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    outJson: outJson,
+                }),
+            };
+        } else if (event.rawPath === '/checkStartDatetime') {
+            return {
+                statusCode: 200,
+                body: JSON.stringify({}),
+            };
+        } else if (event.rawPath === '/cancelPayment') {
+            return {
+                statusCode: 200,
+                body: JSON.stringify({}),
+            };
         } else {
             return {
-                statusCode: 400,
+                statusCode: 404,
                 body: 'Hello world. This is a bad request.',
             };
         }
+    } else {
+        return {
+            statusCode: 400,
+            body: 'Hello world. This is a bad request.',
+        };
     }
+}
 };
 
 
@@ -567,6 +561,83 @@ async function sendEmail(
     };
 
     await ses.send(new SendEmailCommand(params));
+
+    return true;
+}
+
+
+async function cancelPayment(collectionId: string) {
+    if (collectionId == undefined) {
+        return false;
+    }
+    // Get collection info
+    const params = {
+        Key: { collectionId: { S: collectionId } },
+        TableName: Table.Collections.tableName,
+    };
+
+    const { Item } = await dynamoDb.getItem(params);
+
+    if (
+        !Item ||
+        Item.email.S == undefined ||
+        Item.name.S == undefined ||
+        Item.secretKey.S == undefined
+    ) {
+        return false;
+    }
+
+    // If collectionStatus is not 3 (error), return error
+    if (Item.collectionStatus.N != '3') {
+        return false;
+    }
+
+    // Request payment cancellation to Toss PG
+    const url =
+        'https://api.tosspayments.com/v1/payments/' +
+        Item.paymentKey.S +
+        '/cancel';
+
+    let headers = {
+        'Content-Type': 'application/json',
+        Authorization:
+            'Basic ' +
+            Buffer.from(Config.TOSS_PAYMENTS_API_KEY + ':').toString('base64'),
+    };
+
+    let data = {
+        cancelReason: 'user cancelled payment because of error',
+    };
+
+    let toss_response = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(data),
+    });
+
+    // If Toss PG returns error, return error
+    if (toss_response.status != 200) {
+        return false;
+    }
+
+    // Cancel payment
+    await dynamoDb.updateItem({
+        TableName: Table.Collections.tableName,
+        Key: { collectionId: { S: collectionId } },
+        UpdateExpression: 'set cStatus = :p',
+        ExpressionAttributeValues: {
+            ':p': { N: '4' },
+        },
+    });
+
+    // send email
+    await sendEmail(
+        'paymentCancelled',
+        Item.email.S,
+        Item.name.S,
+        collectionId,
+        Item.secretKey.S
+    );
 
     return true;
 }
