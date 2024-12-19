@@ -78,10 +78,152 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
         }
     } else if (event.requestContext.http.method === 'POST') {
         if (event.rawPath === '/updateCollectionStatus') {
+            // Get collectionId, secretKey, collectionStatus, runpodSecretKey
+            if (event.body == undefined) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Invalid request body',
+                    }),
+                };
+            }
+            const body = JSON.parse(event.body);
+            const collectionId = body.collectionId;
+            const secretKey = body.secretKey;
+            const collectionStatus = body.collectionStatus;
+            const runpodSecretKey = body.runpodSecretKey;
+
+            // check runpodSecretKey
+            if (runpodSecretKey != Config.RUNPOD_SECRET_KEY) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided runpodSecretKey',
+                    }),
+                };
+            }
+
+            // get current time
+            const currentDatetime = new Date().toISOString();
+
+            if (!collectionId || !secretKey || !collectionStatus) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Please provide both "collectionId" and "collectionStatus" and "secretKey"',
+                    }),
+                };
+            }
+
+            // Check secretKey
+            const params = {
+                Key: { collectionId: { S: collectionId } },
+                TableName: Table.Collections.tableName,
+            };
+
+            const { Item } = await dynamoDb.getItem(params);
+
+            if (
+                !Item ||
+                Item.email.S == undefined ||
+                Item.name.S == undefined ||
+                Item.secretKey.S == undefined
+            ) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided "collectionId"',
+                    }),
+                };
+            }
+
+            if (Item.secretKey.S != secretKey) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided secretKey',
+                    }),
+                };
+            }
+
+            if (parseInt(collectionStatus) == 1) {
+                // If collectionStatus is 1, update startDatetime
+                console.log('Dreambooth started!');
+                console.log('collectionId: ', collectionId);
+                console.log('startDatetime: ', currentDatetime);
+                await dynamoDb.updateItem({
+                    TableName: Table.Collections.tableName,
+                    Key: { collectionId: { S: collectionId } },
+                    UpdateExpression: 'set collectionStatus = :p, startDatetime = :s',
+                    ExpressionAttributeValues: {
+                        ':p': { N: '1' },
+                        ':s': { S: currentDatetime },
+                    },
+                });
+            } else if (parseInt(collectionStatus) == 2) {
+                // if collectionStatus is 2, update endDatetime
+                console.log('Dreambooth ended!');
+                console.log('collectionId: ', collectionId);
+                console.log('endDatetime: ', currentDatetime);
+                await dynamoDb.updateItem({
+                    TableName: Table.Collections.tableName,
+                    Key: { collectionId: { S: collectionId } },
+                    UpdateExpression: 'set collectionStatus = :p, endDatetime = :e',
+                    ExpressionAttributeValues: {
+                        ':p': { N: '2' },
+                        ':e': { S: currentDatetime },
+                    },
+                });
+                // Send email with template image ready message
+                await sendEmail(
+                    'imageReady',
+                    Item.email.S,
+                    Item.name.S,
+                    collectionId,
+                    Item.secretKey.S
+                );
+            } else if (parseInt(collectionStatus) == 3) {
+                // If collectionStatus is 3, update endDatetime
+                console.log('Dreambooth ERROR!');
+                console.log('collectionId: ', collectionId);
+                console.log('endDatetime: ', currentDatetime);
+                await dynamoDb.updateItem({
+                    TableName: Table.Collections.tableName,
+                    Key: { collectionId: { S: collectionId } },
+                    UpdateExpression: 'set collectionStatus = :p, endDatetime = :e',
+                    ExpressionAttributeValues: {
+                        ':p': { N: '3' },
+                        ':e': { S: currentDatetime },
+                    },
+                });
+                // Cancel the payment
+                await cancelPayment(collectionId);
+            } else {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Invalid collectionStatus',
+                    }),
+                };
+            }
+
             return {
                 statusCode: 200,
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                    collectionId: collectionId,
+                }),
             };
+        }
         } else if (event.rawPath === '/createCollection') {
             const collectionId = uuidv4();
             if (event.body == undefined) {
