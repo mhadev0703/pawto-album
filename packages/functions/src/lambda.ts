@@ -617,29 +617,135 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 }),
             };
         } else if (event.rawPath === '/checkStartDatetime') {
+        // Get collectionId, secretKey, runpodSecretKey
+        if (event.body == undefined) {
             return {
-                statusCode: 200,
-                body: JSON.stringify({}),
-            };
-        } else if (event.rawPath === '/cancelPayment') {
-            return {
-                statusCode: 200,
-                body: JSON.stringify({}),
-            };
-        } else {
-            return {
-                statusCode: 404,
-                body: 'Hello world. This is a bad request.',
+                statusCode: 400,
+                body: JSON.stringify({
+                    error: true,
+                    message: 'Invalid request body',
+                }),
             };
         }
+        const body = JSON.parse(event.body);
+        const collectionId = body.collectionId;
+        const secretKey = body.secretKey;
+        const runpodSecretKey = body.runpodSecretKey;
+
+        // Check runpodSecretKey
+        if (runpodSecretKey != Config.RUNPOD_SECRET_KEY) {
+            return {
+                statusCode: 404,
+                body: JSON.stringify({
+                    error: true,
+                    message: 'runpodSecretKey error',
+                }),
+            };
+        }
+
+        if (!collectionId || !secretKey) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    error: true,
+                    message:
+                        'Please provide "collectionId", "collectionStatus" and "secretKey"',
+                }),
+            };
+        }
+
+        // Check secretKey
+        const params = {
+            Key: { collectionId: { S: collectionId } },
+            TableName: Table.Collections.tableName,
+        };
+
+        const { Item } = await dynamoDb.getItem(params);
+
+        if (
+            !Item ||
+            Item.email.S == undefined ||
+            Item.name.S == undefined ||
+            Item.secretKey.S == undefined
+        ) {
+            return {
+                statusCode: 404,
+                body: JSON.stringify({
+                    error: true,
+                    message:
+                        'Could not find collection with provided "collectionId"',
+                }),
+            };
+        }
+
+        if (Item.secretKey.S != secretKey) {
+            return {
+                statusCode: 404,
+                body: JSON.stringify({
+                    error: true,
+                    message:
+                        'Could not find collection with provided secretKey',
+                }),
+            };
+        }
+
+        // Check startDatetime is empty
+        const startDatetime = Item.startDatetime.S;
+        if (startDatetime != '') {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    startDatetime: startDatetime,
+                }),
+            };
+        }
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                startDatetime: '',
+            }),
+        };
+    } else if (event.rawPath === '/cancelPayment') {
+        // Get collectionId from request body
+        if (event.body == undefined) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    error: true,
+                    message: 'Invalid request body',
+                }),
+            };
+        }
+        const body = JSON.parse(event.body);
+
+        const collectionId = body.collectionId;
+        const result = await cancelPayment(collectionId);
+
+        if (result == false) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    error: true,
+                    message: 'Failed due to the cancelled payment',
+                }),
+            };
+        }
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                result: result,
+                message: 'Your payment has been cancelled',
+            }),
+        };
     } else {
         return {
-            statusCode: 400,
+            statusCode: 404,
             body: 'Hello world. This is a bad request.',
         };
     }
 }
-};
 
 
 async function sendEmail(
