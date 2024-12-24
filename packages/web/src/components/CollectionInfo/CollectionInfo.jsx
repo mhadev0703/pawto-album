@@ -85,6 +85,7 @@ export default function CollectionInfo(props) {
             );
         }
 
+        // Send the data to the server
         let url = `${REACT_APP_API_ADDRESS}/createCollection`;
         let data = {
             name: title,
@@ -121,7 +122,7 @@ export default function CollectionInfo(props) {
                     onChange={(e) => {
                         changeTitle(e);
                     }}
-                    placeholder='e.g., Our dog Charlie, max 20 characters.'
+                    placeholder='e.g., My dog Charlie (Max 20 characters)'
                     maxLength={20}
                 />
             </div>
@@ -183,7 +184,7 @@ export default function CollectionInfo(props) {
                 <div className='input-info'>
                     <label>Photos</label>
                     <span>
-                        - Click on the photo to adjust the cropping position around the subject
+                        - Click on the photo to adjust the crop around the subject
                     </span>
                 </div>
                 <div className='upload-image-preview'>
@@ -209,7 +210,7 @@ export default function CollectionInfo(props) {
                     }}
                 />
                 <label className='checkbox-label' htmlFor='agree-checkbox'>
-                    I agree to receive informational (non-promotional) emails
+                    I agree to receive non-promotional emails related to the progress, payment, and results of my request.
                 </label>
             </div>
             <div className='center-button'>
