@@ -63,9 +63,112 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 }),
             };
         } else if (event.rawPath === '/getImages') {
+            const collectionId = event.queryStringParameters?.collectionId;
+            const secretKey = event.queryStringParameters?.secretKey;
+
+            if (!collectionId || !secretKey) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Please provide both "collectionId" and "secretKey"',
+                    }),
+                };
+            }
+
+            // Get collection info
+            const params = {
+                Key: { collectionId: { S: collectionId } },
+                TableName: Table.Collections.tableName,
+            };
+
+            const { Item } = await dynamoDb.getItem(params);
+
+            if (
+                !Item ||
+                Item.email.S == undefined ||
+                Item.name.S == undefined ||
+                Item.secretKey.S == undefined
+            ) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided "collectionId"',
+                    }),
+                };
+            }
+
+            if (Item.secretKey.S != secretKey) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        error: true,
+                        message:
+                            'Could not find collection with provided secretKey',
+                    }),
+                };
+            }
+
+            // If collectionStatus is not 2 (completed), return error
+            if (Item.collectionStatus.N != '2') {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'Image is not ready',
+                    }),
+                };
+            }
+
+            // Get list of s3 objects in collection's folder
+            const response = await s3.listObjectsV2({
+                Bucket: Bucket.Uploads.bucketName,
+                Prefix: `${collectionId}/results/`,
+            });
+
+            // If collection's folder is empty, return error
+            if (!response.Contents) {
+                return {
+                    statusCode: 400,
+                    body: JSON.stringify({
+                        error: true,
+                        message: 'No image found',
+                    }),
+                };
+            }
+
+            // Generate presigned url for every image in collection's folder
+            let urls = [];
+            // Sort by last modified time
+            response.Contents.sort(
+                (a: any, b: any) =>
+                    parseInt(a.Key.split('result (')[1].split(')')[0]) -
+                    parseInt(b.Key.split('result (')[1].split(')')[0])
+            );
+
+            // Generate presigned url for each image
+            const s3Client = new S3Client({ region: 'us-east-1' });
+            for (const obj of response.Contents) {
+                const getObjectParams = {
+                    Bucket: Bucket.Uploads.bucketName,
+                    Key: obj.Key,
+                };
+                const command = new GetObjectCommand(getObjectParams);
+                // Presigned url will expire in 1 hour
+                const url = await getSignedUrl(s3Client, command, {
+                    expiresIn: 3600,
+                });
+                urls.push(url);
+            }
+
             return {
                 statusCode: 200,
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                    urls: urls,
+                }),
             };
         } else {
             return {
