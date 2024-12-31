@@ -682,14 +682,18 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
             // When not running RunPod, set runit to false
             const runit = true;
             let outJson = {} as any;
+
             if (runit) {
                 // Codes to run RunPod
                 const header = {
                     'Content-Type': 'application/json',
-                    authorization: 'runpodApiKey',
+                authorization: process.env.RUNPOD_AUTHORIZATION_KEY || '',
                 };
-                let url = 'https://api.runpod.ai/v2/[serverlessid]/run';
 
+            const runpodUrl = 'https://api.runpod.ai/v2/${process.env.RUNPOD_URL_ID}';
+
+            // Send initial request to RunPod
+            let url = `${runpodUrl}/run`
                 let response = await fetch(url, {
                     method: 'POST',
                     headers: header,
@@ -699,7 +703,8 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
                 outJson = await response.json();
                 const outId = outJson?.id;
                 try {
-                    url = `https://api.runpod.ai/v2/[serverlessid]/status/${outId}`;
+                // Check status
+                url = `${runpodUrl}/status/${outId}`;
                     response = await fetch(url, {
                         method: 'POST',
                         headers: header,
