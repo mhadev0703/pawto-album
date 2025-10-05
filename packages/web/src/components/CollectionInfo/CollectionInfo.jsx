@@ -95,10 +95,12 @@ export default function CollectionInfo(props) {
         };
 
         let config = { 'Content-Type': 'application/json' };
+        console.log('Request Headers:', config.headers);
         console.log(data);
         axios
             .post(url, data, config)
             .then((res) => {
+                console.log('Server Response:', res.data);
                 if (res.data.collectionId) {
                     let newPath = '/order?collectionId=' + res.data.collectionId;
                     navigate(newPath);
