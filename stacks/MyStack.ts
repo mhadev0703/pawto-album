@@ -30,12 +30,23 @@ export function API({ stack }: StackContext) {
         stack,
         'TOSS_PAYMENTS_API_KEY'
     );
+    // const BANANA_SECRET_KEY = new Config.Secret(stack, 'BANANA_SECRET_KEY');
+    const RUNPOD_SECRET_KEY = new Config.Secret(stack, 'RUNPOD_SECRET_KEY');
 
     const api = new Api(stack, 'pawto-album', {
         cors: true,  // Enable CORS
         defaults: {
             function: {
-                bind: [UploadsBucket, CollectionsTable, SENDER_EMAIL, TOSS_PAYMENTS_API_KEY],  // Bind the resources to the function
+                runtime: "nodejs20.x",
+                // Bind the resources to the function
+                bind: [
+                    UploadsBucket, 
+                    CollectionsTable, 
+                    SENDER_EMAIL, 
+                    TOSS_PAYMENTS_API_KEY, 
+                    // BANANA_SECRET_KEY
+                    RUNPOD_SECRET_KEY
+                ],  
             },
         },
         routes: {
@@ -59,6 +70,7 @@ export function API({ stack }: StackContext) {
         environment: {
             VITE_API_URL: api.customDomainUrl || api.url,
             VITE_APP_URL: 'http://localhost:5173',
+            VITE_TOSS_CLIENT_KEY: 'test_ck_PBal2vxj81y7lOk0KXGw85RQgOAN'
         },
         buildOutput: 'dist',
         buildCommand: 'npm run build',
