@@ -9,6 +9,11 @@ export default {
     };
   },
   stacks(app) {
+    // Set default runtime for all functions
+    app.setDefaultFunctionProps({
+      runtime: "nodejs20.x",
+    });
+    
     app.stack(API);
   }
 } satisfies SSTConfig;
